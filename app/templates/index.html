@@ -20,8 +20,7 @@
           <button class="nav-tab" onclick="show('pacientes')">👥 Pacientes</button>
           <button class="nav-tab" onclick="show('cascos')">📦 Stock Cascos</button> <!-- NUEVO -->
           <button class="nav-tab" onclick="show('prestamo')">📋 Nuevo préstamo</button>
-          <button class="nav-tab" onclick="show('historial')">🕐 Historial</button>
-          <button class="nav-tab" onclick="show('pitch')">💡 Propuesta</button>
+          <button class="nav-tab" onclick="show('historial')">🕐 Historial</button>  
         </div>
     </div>
     <div class="topbar-right">
@@ -117,98 +116,74 @@
         </div>
       </div>
     </div>
-    <!-- ══════════════════ GESTIÓN DE CASCOS Y STOCK ══════════════════ -->
-<div class="screen" id="screen-cascos">
+ 
+ <div class="screen" id="screen-cascos">
   <div class="page-header">
     <div>
-      <div class="page-title">Inventario de Cascos de Gel</div>
-      <div class="page-sub">Control de existencias, donaciones y altas de stock</div>
+      <div class="page-title">Stock de cascos</div>
+      <div class="page-sub">Control de existencias de la fundación</div>
     </div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value" id="stock-total">0</div></div>
+    <div class="stat-card"><div class="stat-label">Disponibles</div><div class="stat-value success" id="stock-disponibles">0</div></div>
+    <div class="stat-card"><div class="stat-label">Prestados</div><div class="stat-value accent" id="stock-prestados">0</div></div>
+    <div class="stat-card"><div class="stat-label">En mantenimiento</div><div class="stat-value danger" id="stock-mantenimiento">0</div></div>
+    <div class="stat-card"><div class="stat-label">De baja</div><div class="stat-value" id="stock-baja">0</div></div>
   </div>
 
   <div class="two-col">
-    <!-- Formulario de Alta de Casco / Donación -->
     <div class="card">
-      <div class="card-header"><div class="card-title">➕ Registrar Nuevo Casco / Donación</div></div>
+      <div class="card-header"><div class="card-title">➕ Ingreso de cascos</div></div>
       <div class="card-body">
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Código Identificador</label>
-            <input type="text" id="casco-codigo" placeholder="Ej: C-015 o DON-001">
-          </div>
-          <div class="form-group">
-            <label>Origen de Ingreso</label>
-            <select id="casco-origen">
-              <option value="fundacion">Compra / Stock Fundación</option>
-              <option value="donacion">Donación de Paciente / Particular</option>
-            </select>
-          </div>
-          <div class="form-group full">
-            <label>Observaciones / Donante</label>
-            <textarea id="casco-obs" rows="2" placeholder="Ej: Donado por la familia Gómez o Casco de gel nuevo de reposición"></textarea>
-          </div>
+        <div class="form-group">
+          <label>Cantidad</label>
+          <input type="number" id="stock-ingreso-cant" min="1" value="1">
         </div>
         <div class="form-actions">
-          <button class="btn btn-primary" onclick="guardarNuevoCasco()">💾 Cargar al Inventario</button>
+          <button class="btn btn-primary" onclick="ingresarCascos()">Agregar al stock</button>
         </div>
       </div>
     </div>
 
-    <!-- Resumen rápido de origenes -->
     <div class="card">
-      <div class="card-header"><div class="card-title">ℹ️ Información sobre Ingresos</div></div>
-      <div class="card-body" style="line-height: 1.6; color: #475569;">
-        <p><strong>• Stock Fundación:</strong> Cascos adquiridos directamente por la asociación para la atención inicial.</p>
-        <p style="margin-top: 8px;"><strong>• Donaciones / Reposición:</strong> Cascos entregados por pacientes que concluyeron su tratamiento o donantes anónimos.</p>
-        <p style="margin-top: 8px;"><em>Todos los cascos cargados ingresan automáticamente en estado <strong>disponible</strong>.</em></p>
+      <div class="card-header"><div class="card-title">🔧 Mantenimiento</div></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>Cantidad</label>
+          <input type="number" id="stock-mant-cant" min="1" value="1">
+        </div>
+        <div class="form-actions">
+          <button class="btn" onclick="moverMantenimiento('enviar')">Enviar a mantenimiento</button>
+          <button class="btn btn-primary" onclick="moverMantenimiento('recuperar')">Recuperar (vuelve a disponible)</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Tabla del Inventario de Cascos -->
   <div class="card">
-    <div class="card-header">
-      <div class="card-title">Listado General de Cascos</div>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Código</th>
-            <th>Origen</th>
-            <th>Estado Actual</th>
-            <th>Observaciones</th>
-          </tr>
-        </thead>
-        <tbody id="tabla-cascos-body">
-          <!-- Carga dinámica vía JS -->
-        </tbody>
-      </table>
+    <div class="card-header"><div class="card-title">🗑️ Dar de baja</div></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Cantidad</label>
+          <input type="number" id="stock-baja-cant" min="1" value="1">
+        </div>
+        <div class="form-group">
+          <label>Se descartan de</label>
+          <select id="stock-baja-origen">
+            <option value="disponible">Disponibles</option>
+            <option value="mantenimiento">En mantenimiento</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn" onclick="darDeBaja()">Confirmar baja</button>
+      </div>
     </div>
   </div>
 </div>
-    <!-- NUEVO PRÉSTAMO -->
-    <div class="screen" id="screen-prestamo">
-      <div class="page-header">
-        <div>
-          <div class="page-title">Registrar nuevo préstamo</div>
-        </div>
-        <button class="btn" onclick="show('pacientes')">← Volver</button>
-      </div>
-      <div style="max-width:620px">
-        <div class="card">
-          <div class="card-header"><div class="card-title">Selección de Casco</div></div>
-          <div class="card-body">
-            <div class="form-group">
-              <label>Casco Disponible</label>
-              <select id="select-casco">
-                <!-- Opciones dinámicas -->
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
   </div>
 </div>

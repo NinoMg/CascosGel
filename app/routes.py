@@ -82,6 +82,61 @@ def ingresar_cascos():
     db.session.commit()
     return jsonify(stock.to_dict()), 201
 
+def _leer_cantidad():
+    data = request.get_json() or {}
+    try:
+        cantidad = int(data.get('cantidad', 0))
+    except (TypeError, ValueError):
+        cantidad = 0
+    return data, cantidad
+
+@api.route('/stock/mantenimiento', methods=['POST'])
+@jwt_required()
+def mover_mantenimiento():
+    data, cantidad = _leer_cantidad()
+    accion = data.get('accion')  # 'enviar' o 'recuperar'
+    if cantidad < 1:
+        return jsonify({'error': 'La cantidad debe ser al menos 1'}), 400
+
+    stock = Stock.obtener()
+    if accion == 'enviar':
+        if cantidad > stock.disponibles():
+            return jsonify({'error': f'Solo hay {stock.disponibles()} cascos disponibles'}), 400
+        stock.mantenimiento += cantidad
+    elif accion == 'recuperar':
+        if cantidad > stock.mantenimiento:
+            return jsonify({'error': f'Solo hay {stock.mantenimiento} cascos en mantenimiento'}), 400
+        stock.mantenimiento -= cantidad
+    else:
+        return jsonify({'error': 'Acción inválida'}), 400
+
+    db.session.commit()
+    return jsonify(stock.to_dict()), 200
+
+@api.route('/stock/baja', methods=['POST'])
+@jwt_required()
+def dar_de_baja():
+    data, cantidad = _leer_cantidad()
+    origen = data.get('origen')  # 'disponible' o 'mantenimiento'
+    if cantidad < 1:
+        return jsonify({'error': 'La cantidad debe ser al menos 1'}), 400
+
+    stock = Stock.obtener()
+    if origen == 'disponible':
+        if cantidad > stock.disponibles():
+            return jsonify({'error': f'Solo hay {stock.disponibles()} cascos disponibles'}), 400
+    elif origen == 'mantenimiento':
+        if cantidad > stock.mantenimiento:
+            return jsonify({'error': f'Solo hay {stock.mantenimiento} cascos en mantenimiento'}), 400
+        stock.mantenimiento -= cantidad
+    else:
+        return jsonify({'error': 'Origen inválido'}), 400
+
+    stock.total -= cantidad
+    stock.baja += cantidad
+    db.session.commit()
+    return jsonify(stock.to_dict()), 200
+
 @api.route('/cascos/resumen', methods=['GET'])
 @jwt_required()
 def get_cascos_resumen():

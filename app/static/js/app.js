@@ -16,8 +16,6 @@ function show(name) {
 
   const targetScreen = document.getElementById('screen-' + name);
   if (targetScreen) targetScreen.classList.add('active');
-
-  const order = ['login', 'dashboard', 'pacientes', 'cascos', 'prestamo', 'historial', 'pitch'];
   const tabBtn = document.querySelectorAll('.nav-tab')[order.indexOf(name)];
   if (tabBtn) tabBtn.classList.add('active');
 
@@ -25,7 +23,8 @@ function show(name) {
 
   if (name === 'dashboard') cargarDashboard();
   if (name === 'pacientes') cargarPacientes();
-  if (name === 'cascos') cargarTablaCascos();
+  if (name === 'cascos') cargarStock();
+// borrar: if (name === 'prestamo') cargarCascosDisponibles();
   if (name === 'prestamo') cargarCascosDisponibles();
 }
 
@@ -134,97 +133,72 @@ async function cargarPacientes() {
   }
 }
 
-// Obtener y renderizar la lista completa de cascos
-async function cargarTablaCascos() {
-  const token = localStorage.getItem('token');
-  if (!token) return;
 
+async function cargarStock() {
+  if (!localStorage.getItem('token')) return;
   try {
-    const res = await fetch(`${API_BASE}/cascos`, {
-      headers: getHeaders()
-    });
+    const res = await fetch(`${API_BASE}/stock`, { headers: getHeaders() });
+    if (res.status === 422 || res.status === 401) {
+      localStorage.removeItem('token');
+      show('login');
+      return;
+    }
     if (!res.ok) return;
-
-    const cascos = await res.json();
-    const tbody = document.getElementById('tabla-cascos-body');
-    if (!tbody) return;
-
-    tbody.innerHTML = cascos.map(c => {
-      let badgeClase = 'badge-success';
-      if (c.estado === 'prestado') badgeClase = 'badge-accent';
-      if (c.estado === 'mantenimiento' || c.estado === 'baja') badgeClase = 'badge-danger';
-
-      return `
-        <tr>
-          <td><strong>${c.codigo_identificador}</strong></td>
-          <td><span class="badge badge-neutral">${c.origen === 'donacion' ? '🎁 Donación' : '🏛️ Fundación'}</span></td>
-          <td><span class="badge ${badgeClase}">${c.estado.toUpperCase()}</span></td>
-          <td>${c.observaciones || '—'}</td>
-        </tr>
-      `;
-    }).join('');
+    const s = await res.json();
+    document.getElementById('stock-total').innerText = s.total;
+    document.getElementById('stock-disponibles').innerText = s.disponibles;
+    document.getElementById('stock-prestados').innerText = s.prestados;
+    document.getElementById('stock-mantenimiento').innerText = s.mantenimiento;
+    document.getElementById('stock-baja').innerText = s.baja;
   } catch (err) {
-    console.error('Error cargando cascos:', err);
+    console.error('Error cargando stock:', err);
   }
 }
 
-// Enviar nuevo casco al Backend
-async function guardarNuevoCasco() {
-  const codigo = document.getElementById('casco-codigo').value.trim();
-  const origen = document.getElementById('casco-origen').value;
-  const obs = document.getElementById('casco-obs').value.trim();
-
-  if (!codigo) {
-    alert("Por favor, ingresa el código del casco (ej: C-015).");
-    return;
+function leerCantidad(idInput) {
+  const n = parseInt(document.getElementById(idInput).value, 10);
+  if (!n || n < 1) {
+    alert('Ingresá una cantidad válida (1 o más).');
+    return null;
   }
+  return n;
+}
 
+async function accionStock(url, body, mensajeOk) {
   try {
-    const res = await fetch(`${API_BASE}/cascos`, {
+    const res = await fetch(`${API_BASE}${url}`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({
-        codigo_identificador: codigo,
-        origen: origen,
-        observaciones: obs
-      })
+      body: JSON.stringify(body)
     });
-
     const data = await res.json();
-
     if (res.ok) {
-      alert("✅ Casco cargado con éxito al inventario.");
-      document.getElementById('casco-codigo').value = '';
-      document.getElementById('casco-obs').value = '';
-      cargarTablaCascos();
+      alert(mensajeOk);
+      cargarStock();
       cargarDashboard();
     } else {
-      alert(data.error || "Ocurrió un error al guardar el casco.");
+      alert(data.error || 'Ocurrió un error.');
     }
   } catch (err) {
-    console.error('Error guardando casco:', err);
+    console.error(err);
+    alert('No se pudo conectar con el servidor.');
   }
 }
 
-// Cargar Cascos disponibles en el selector de nuevo préstamo
-async function cargarCascosDisponibles() {
-  const token = localStorage.getItem('token');
-  if (!token) return;
+function ingresarCascos() {
+  const cantidad = leerCantidad('stock-ingreso-cant');
+  if (cantidad) accionStock('/stock/ingreso', { cantidad }, '✅ Cascos agregados al stock.');
+}
 
-  try {
-    const res = await fetch(`${API_BASE}/cascos`, {
-      headers: getHeaders()
-    });
-    if (!res.ok) return;
-    const cascos = await res.json();
-    const select = document.getElementById('select-casco');
-    if (!select) return;
+function moverMantenimiento(accion) {
+  const cantidad = leerCantidad('stock-mant-cant');
+  if (cantidad) accionStock('/stock/mantenimiento', { cantidad, accion }, '✅ Stock actualizado.');
+}
 
-    select.innerHTML = cascos
-      .filter(c => c.estado === 'disponible')
-      .map(c => `<option value="${c.id}">${c.codigo_identificador} · ${c.origen}</option>`)
-      .join('');
-  } catch (err) {
-    console.error(err);
+function darDeBaja() {
+  const cantidad = leerCantidad('stock-baja-cant');
+  const origen = document.getElementById('stock-baja-origen').value;
+  if (cantidad && confirm(`¿Dar de baja ${cantidad} casco(s)? No se puede deshacer.`)) {
+    accionStock('/stock/baja', { cantidad, origen }, '✅ Baja registrada.');
   }
 }
