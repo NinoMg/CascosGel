@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from app.models import db, Usuario, Casco, Paciente, Prestamo
+from datetime import date
+from app.models import db, Usuario, Paciente, Prestamo, Stock
 
 api = Blueprint('api', __name__)
 
@@ -59,48 +60,39 @@ def create_paciente():
     return jsonify(nuevo_paciente.to_dict()), 201
 
 
-# --- CASCOS E INVENTARIO ---
-@api.route('/cascos', methods=['GET'])
+# --- STOCK ---
+@api.route('/stock', methods=['GET'])
 @jwt_required()
-def get_cascos():
-    cascos = Casco.query.all()
-    return jsonify([c.to_dict() for c in cascos]), 200
+def get_stock():
+    return jsonify(Stock.obtener().to_dict()), 200
 
-@api.route('/cascos', methods=['POST'])
+@api.route('/stock/ingreso', methods=['POST'])
 @jwt_required()
-def create_casco():
+def ingresar_cascos():
     data = request.get_json() or {}
-    codigo = data.get('codigo_identificador')
-    origen = data.get('origen', 'fundacion')
-    observaciones = data.get('observaciones', '')
+    try:
+        cantidad = int(data.get('cantidad', 0))
+    except (TypeError, ValueError):
+        cantidad = 0
+    if cantidad < 1:
+        return jsonify({'error': 'La cantidad debe ser al menos 1'}), 400
 
-    if not codigo:
-        return jsonify({'error': 'El código del casco es obligatorio (ej: C-015)'}), 400
-
-    if Casco.query.filter_by(codigo_identificador=codigo).first():
-        return jsonify({'error': f'El casco {codigo} ya se encuentra registrado.'}), 400
-
-    nuevo_casco = Casco(
-        codigo_identificador=codigo,
-        estado='disponible',
-        origen=origen,
-        observaciones=observaciones
-    )
-    db.session.add(nuevo_casco)
+    stock = Stock.obtener()
+    stock.total += cantidad
     db.session.commit()
-    return jsonify(nuevo_casco.to_dict()), 201
+    return jsonify(stock.to_dict()), 201
 
 @api.route('/cascos/resumen', methods=['GET'])
 @jwt_required()
 def get_cascos_resumen():
-    total = Casco.query.count()
-    prestados = Casco.query.filter_by(estado='prestado').count()
-    disponibles = Casco.query.filter_by(estado='disponible').count()
-    vencidos = Prestamo.query.filter_by(estado='activo').filter(Prestamo.fecha_vencimiento < db.func.current_date()).count()
-
+    stock = Stock.obtener()
+    vencidos = Prestamo.query.filter(
+        Prestamo.fecha_devolucion.is_(None),
+        Prestamo.fecha_vencimiento < date.today()
+    ).count()
     return jsonify({
-        'total': total,
-        'prestados': prestados,
-        'disponibles': disponibles,
+        'total': stock.total,
+        'prestados': stock.prestados(),
+        'disponibles': stock.disponibles(),
         'vencidos': vencidos
     }), 200
