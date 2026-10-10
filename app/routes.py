@@ -30,34 +30,48 @@ def login():
 
 
 # --- PACIENTES ---
+def _validar_paciente(data):
+    campos = {
+        'nombre': (data.get('nombre') or '').strip(),
+        'telefono1': (data.get('telefono1') or '').strip(),
+        'telefono2': (data.get('telefono2') or '').strip() or None,
+        'direccion': (data.get('direccion') or '').strip(),
+        'periodo': (data.get('periodo') or '').strip(),
+    }
+    if not (campos['nombre'] and campos['telefono1'] and campos['direccion'] and campos['periodo']):
+        return None, 'Faltan campos obligatorios'
+    return campos, None
+
 @api.route('/pacientes', methods=['GET'])
 @jwt_required()
 def get_pacientes():
-    pacientes = Paciente.query.all()
+    pacientes = Paciente.query.order_by(Paciente.nombre).all()
     return jsonify([p.to_dict() for p in pacientes]), 200
 
 @api.route('/pacientes', methods=['POST'])
 @jwt_required()
 def create_paciente():
-    data = request.get_json() or {}
-    nombre = data.get('nombre')
-    telefono1 = data.get('telefono1')
-    direccion = data.get('direccion')
-    periodo = data.get('periodo')
-
-    if not nombre or not telefono1 or not direccion or not periodo:
-        return jsonify({'error': 'Faltan campos obligatorios'}), 400
-
-    nuevo_paciente = Paciente(
-        nombre=nombre,
-        telefono1=telefono1,
-        telefono2=data.get('telefono2'),
-        direccion=direccion,
-        periodo=periodo
-    )
-    db.session.add(nuevo_paciente)
+    campos, error = _validar_paciente(request.get_json() or {})
+    if error:
+        return jsonify({'error': error}), 400
+    nuevo = Paciente(**campos)
+    db.session.add(nuevo)
     db.session.commit()
-    return jsonify(nuevo_paciente.to_dict()), 201
+    return jsonify(nuevo.to_dict()), 201
+
+@api.route('/pacientes/<int:paciente_id>', methods=['PUT'])
+@jwt_required()
+def update_paciente(paciente_id):
+    paciente = db.session.get(Paciente, paciente_id)
+    if not paciente:
+        return jsonify({'error': 'Paciente no encontrado'}), 404
+    campos, error = _validar_paciente(request.get_json() or {})
+    if error:
+        return jsonify({'error': error}), 400
+    for clave, valor in campos.items():
+        setattr(paciente, clave, valor)
+    db.session.commit()
+    return jsonify(paciente.to_dict()), 200
 
 
 # --- STOCK ---

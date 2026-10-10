@@ -87,6 +87,43 @@
     <!-- PACIENTES -->
     <div class="screen" id="screen-pacientes">
       <div class="page-header">
+        <div class="card">
+  <div class="card-header"><div class="card-title" id="paciente-form-titulo">➕ Nuevo paciente</div></div>
+  <div class="card-body">
+    <input type="hidden" id="paciente-id">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Nombre y apellido *</label>
+        <input type="text" id="paciente-nombre">
+      </div>
+      <div class="form-group">
+        <label>Dirección *</label>
+        <input type="text" id="paciente-direccion">
+      </div>
+      <div class="form-group">
+        <label>Teléfono 1 *</label>
+        <input type="tel" id="paciente-tel1">
+      </div>
+      <div class="form-group">
+        <label>Teléfono 2</label>
+        <input type="tel" id="paciente-tel2">
+      </div>
+      <div class="form-group">
+        <label>Período de préstamo *</label>
+        <select id="paciente-periodo">
+          <option value="1 mes">1 mes</option>
+          <option value="3 meses">3 meses</option>
+          <option value="6 meses" selected>6 meses</option>
+          <option value="12 meses">12 meses</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" id="paciente-cancelar" style="display:none" onclick="cancelarEdicionPaciente()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarPaciente()">Guardar paciente</button>
+    </div>
+  </div>
+</div>
         <div>
           <div class="page-title">Pacientes</div>
           <div class="page-sub">Padrón de pacientes registrados</div>
@@ -95,8 +132,9 @@
       </div>
       <div class="card">
         <div class="card-header">
-          <div class="card-title">Todos los pacientes</div>
-        </div>
+  <div class="card-title">Todos los pacientes</div>
+  <input type="search" id="paciente-buscar" placeholder="Buscar por nombre o teléfono..." oninput="renderPacientes()">
+</div>
         <div class="table-wrap">
           <table>
             <thead>

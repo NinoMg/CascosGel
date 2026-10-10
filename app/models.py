@@ -25,7 +25,11 @@ class Paciente(db.Model):
     __tablename__ = 'pacientes'
 
     id = db.Column(db.Integer, primary_key=True)
-    ...
+    nombre = db.Column(db.String(100), nullable=False)
+    telefono1 = db.Column(db.String(20), nullable=False)
+    telefono2 = db.Column(db.String(20), nullable=True)
+    direccion = db.Column(db.String(200), nullable=False)
+    periodo = db.Column(db.String(50), nullable=False)  # ej: "6 meses"
     creado_en = db.Column(db.DateTime, default=datetime.utcnow)
 
     prestamos = db.relationship('Prestamo', backref='paciente', lazy=True)
@@ -43,7 +47,6 @@ class Paciente(db.Model):
             'cantidad_cascos_prestados': cascos_prestados_cant,
             'creado_en': self.creado_en.isoformat()
         }
-
 
 
 class Prestamo(db.Model):

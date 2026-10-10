@@ -28,21 +28,141 @@ function show(name) {
   if (name === 'prestamo') cargarCascosDisponibles();
 }
 
-// Botón de WhatsApp dinámico
-function enviarWhatsApp(telefono, nombrePaciente, codigoCasco, fechaVencimiento) {
+
+let pacientesCache = [];
+
+// Evita que un nombre con símbolos rompa o inyecte HTML
+function esc(texto) {
+  const d = document.createElement('div');
+  d.textContent = texto ?? '';
+  return d.innerHTML;
+}
+
+async function cargarPacientes() {
+  if (!localStorage.getItem('token')) return;
+  try {
+    const res = await fetch(`${API_BASE}/pacientes`, { headers: getHeaders() });
+    if (res.status === 401 || res.status === 422) {
+      localStorage.removeItem('token');
+      show('login');
+      return;
+    }
+    if (!res.ok) return;
+    pacientesCache = await res.json();
+    renderPacientes();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function renderPacientes() {
+  const tbody = document.getElementById('tabla-pacientes-body');
+  if (!tbody) return;
+
+  const q = (document.getElementById('paciente-buscar').value || '').trim().toLowerCase();
+  const lista = pacientesCache.filter(p =>
+    !q ||
+    p.nombre.toLowerCase().includes(q) ||
+    (p.telefono1 || '').includes(q) ||
+    (p.telefono2 || '').includes(q)
+  );
+
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="6">No hay pacientes para mostrar.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = lista.map(p => `
+    <tr>
+      <td><strong>${esc(p.nombre)}</strong></td>
+      <td>${esc(p.direccion)}</td>
+      <td>${esc(p.telefono1)}${p.telefono2 ? ' / ' + esc(p.telefono2) : ''}</td>
+      <td><span class="badge badge-accent">${p.cantidad_cascos_prestados} prestados</span></td>
+      <td>${esc(p.periodo)}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn btn-sm" onclick="editarPaciente(${p.id})">Editar</button>
+          <button class="btn btn-sm" onclick="show('historial')">Ver</button>
+          <button class="btn btn-sm btn-wsp" onclick="enviarWhatsAppPaciente(${p.id})">💬 WhatsApp</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function guardarPaciente() {
+  const id = document.getElementById('paciente-id').value;
+  const body = {
+    nombre: document.getElementById('paciente-nombre').value,
+    direccion: document.getElementById('paciente-direccion').value,
+    telefono1: document.getElementById('paciente-tel1').value,
+    telefono2: document.getElementById('paciente-tel2').value,
+    periodo: document.getElementById('paciente-periodo').value
+  };
+
+  try {
+    const res = await fetch(`${API_BASE}/pacientes${id ? '/' + id : ''}`, {
+      method: id ? 'PUT' : 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alert(id ? '✅ Paciente actualizado.' : '✅ Paciente registrado.');
+      cancelarEdicionPaciente();
+      cargarPacientes();
+    } else {
+      alert(data.error || 'Ocurrió un error.');
+    }
+  } catch (err) {
+    console.error(err);
+    alert('No se pudo conectar con el servidor.');
+  }
+}
+
+function editarPaciente(id) {
+  const p = pacientesCache.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('paciente-id').value = p.id;
+  document.getElementById('paciente-nombre').value = p.nombre;
+  document.getElementById('paciente-direccion').value = p.direccion;
+  document.getElementById('paciente-tel1').value = p.telefono1;
+  document.getElementById('paciente-tel2').value = p.telefono2 || '';
+  document.getElementById('paciente-periodo').value = p.periodo;
+  document.getElementById('paciente-form-titulo').innerText = '✏️ Editar paciente';
+  document.getElementById('paciente-cancelar').style.display = '';
+  window.scrollTo(0, 0);
+}
+
+function cancelarEdicionPaciente() {
+  ['paciente-id', 'paciente-nombre', 'paciente-direccion', 'paciente-tel1', 'paciente-tel2']
+    .forEach(i => document.getElementById(i).value = '');
+  document.getElementById('paciente-periodo').value = '6 meses';
+  document.getElementById('paciente-form-titulo').innerText = '➕ Nuevo paciente';
+  document.getElementById('paciente-cancelar').style.display = 'none';
+}
+
+function enviarWhatsApp(telefono, nombre, fechaVencimiento) {
   if (!telefono) {
-    alert("El paciente no tiene un número de teléfono registrado.");
+    alert('El paciente no tiene un número de teléfono registrado.');
     return;
   }
   let num = telefono.replace(/\D/g, '');
   if (num.startsWith('0')) num = num.substring(1);
   if (!num.startsWith('549')) num = '549' + num;
 
+  const vence = fechaVencimiento ? `, cuyo vencimiento es el ${fechaVencimiento}` : '';
   const mensaje = encodeURIComponent(
-    `Hola ${nombrePaciente}, te escribimos de la Fundación Oncológica para coordinar el seguimiento/devolución del casco de gel (${codigoCasco || 'asignado'}) prestado, cuyo vencimiento es el ${fechaVencimiento || 'próximo'}. ¡Muchas gracias!`
+    `Hola ${nombre}, te escribimos de la Fundación Oncológica para coordinar el seguimiento/devolución del casco de gel prestado${vence}. ¡Muchas gracias!`
   );
   window.open(`https://wa.me/${num}?text=${mensaje}`, '_blank');
 }
+
+function enviarWhatsAppPaciente(id) {
+  const p = pacientesCache.find(x => x.id === id);
+  if (p) enviarWhatsApp(p.telefono1, p.nombre, null);
+}
+
 
 // Iniciar sesión
 async function iniciarSesion() {
@@ -98,40 +218,6 @@ async function cargarDashboard() {
   }
 }
 
-// Cargar Pacientes desde la API
-async function cargarPacientes() {
-  const token = localStorage.getItem('token');
-  if (!token) return;
-
-  try {
-    const res = await fetch(`${API_BASE}/pacientes`, {
-      headers: getHeaders()
-    });
-    if (!res.ok) return;
-
-    const pacientes = await res.json();
-    const tbody = document.getElementById('tabla-pacientes-body');
-    if (!tbody) return;
-
-    tbody.innerHTML = pacientes.map(p => `
-      <tr>
-        <td><strong>${p.nombre}</strong></td>
-        <td>${p.direccion}</td>
-        <td>${p.telefono1} ${p.telefono2 ? ' / ' + p.telefono2 : ''}</td>
-        <td><span class="badge badge-accent">${p.cantidad_cascos_prestados} prestados</span></td>
-        <td>${p.periodo}</td>
-        <td>
-          <div class="row-actions">
-            <button class="btn btn-sm" onclick="show('historial')">Ver</button>
-            <button class="btn btn-sm btn-wsp" onclick="enviarWhatsApp('${p.telefono1}', '${p.nombre}', 'C-001', 'Próximo')">💬 WhatsApp</button>
-          </div>
-        </td>
-      </tr>
-    `).join('');
-  } catch (err) {
-    console.error(err);
-  }
-}
 
 
 async function cargarStock() {
