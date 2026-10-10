@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from datetime import date
 from app.models import db, Usuario, Paciente, Prestamo, Stock
+from app.utils import calcular_fecha_vencimiento
 
 api = Blueprint('api', __name__)
 
@@ -165,3 +166,48 @@ def get_cascos_resumen():
         'disponibles': stock.disponibles(),
         'vencidos': vencidos
     }), 200
+
+# --- PRÉSTAMOS ---
+@api.route('/prestamos', methods=['POST'])
+@jwt_required()
+def crear_prestamo():
+    data = request.get_json() or {}
+
+    try:
+        paciente_id = int(data.get('paciente_id'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Seleccioná un paciente'}), 400
+    paciente = db.session.get(Paciente, paciente_id)
+    if not paciente:
+        return jsonify({'error': 'Paciente no encontrado'}), 404
+
+    try:
+        cantidad = int(data.get('cantidad', 0))
+    except (TypeError, ValueError):
+        cantidad = 0
+    if cantidad < 1:
+        return jsonify({'error': 'La cantidad debe ser al menos 1'}), 400
+
+    stock = Stock.obtener()
+    if cantidad > stock.disponibles():
+        return jsonify({'error': f'Solo hay {stock.disponibles()} cascos disponibles'}), 400
+
+    hoy = date.today()
+    if data.get('fecha_vencimiento'):
+        try:
+            vencimiento = date.fromisoformat(data['fecha_vencimiento'])
+        except ValueError:
+            return jsonify({'error': 'Fecha de vencimiento inválida'}), 400
+    else:
+        vencimiento = calcular_fecha_vencimiento(hoy, paciente.periodo)
+
+    prestamo = Prestamo(
+        paciente_id=paciente.id,
+        cantidad=cantidad,
+        fecha_prestamo=hoy,
+        fecha_vencimiento=vencimiento,
+        observaciones=(data.get('observaciones') or '').strip() or None
+    )
+    db.session.add(prestamo)
+    db.session.commit()
+    return jsonify(prestamo.to_dict()), 201

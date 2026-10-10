@@ -16,6 +16,8 @@ function show(name) {
 
   const targetScreen = document.getElementById('screen-' + name);
   if (targetScreen) targetScreen.classList.add('active');
+
+  const order = ['login', 'dashboard', 'pacientes', 'cascos', 'prestamo', 'historial'];
   const tabBtn = document.querySelectorAll('.nav-tab')[order.indexOf(name)];
   if (tabBtn) tabBtn.classList.add('active');
 
@@ -24,8 +26,8 @@ function show(name) {
   if (name === 'dashboard') cargarDashboard();
   if (name === 'pacientes') cargarPacientes();
   if (name === 'cascos') cargarStock();
-// borrar: if (name === 'prestamo') cargarCascosDisponibles();
-  if (name === 'prestamo') cargarCascosDisponibles();
+  if (name === 'prestamo') prepararPrestamo();
+
 }
 
 
@@ -286,5 +288,108 @@ function darDeBaja() {
   const origen = document.getElementById('stock-baja-origen').value;
   if (cantidad && confirm(`¿Dar de baja ${cantidad} casco(s)? No se puede deshacer.`)) {
     accionStock('/stock/baja', { cantidad, origen }, '✅ Baja registrada.');
+  }
+}
+
+// ---- Nuevo préstamo ----
+const DIAS_PERIODO = { '1 mes': 30, '3 meses': 90, '6 meses': 180, '12 meses': 365 };
+
+// Fecha local en formato AAAA-MM-DD (evita desfases de zona horaria)
+function fechaISO(f) {
+  const m = String(f.getMonth() + 1).padStart(2, '0');
+  const d = String(f.getDate()).padStart(2, '0');
+  return `${f.getFullYear()}-${m}-${d}`;
+}
+
+async function prepararPrestamo() {
+  if (!localStorage.getItem('token')) return;
+  try {
+    const [resP, resS] = await Promise.all([
+      fetch(`${API_BASE}/pacientes`, { headers: getHeaders() }),
+      fetch(`${API_BASE}/stock`, { headers: getHeaders() })
+    ]);
+    if (resP.status === 401 || resP.status === 422) {
+      localStorage.removeItem('token');
+      show('login');
+      return;
+    }
+    if (!resP.ok || !resS.ok) return;
+
+    pacientesCache = await resP.json();
+    const stock = await resS.json();
+    document.getElementById('prestamo-disponibles').innerText = stock.disponibles;
+    document.getElementById('prestamo-cantidad').max = stock.disponibles;
+
+    const lista = document.getElementById('lista-pacientes');
+    lista.innerHTML = '';
+    pacientesCache.forEach(p => {
+      const op = document.createElement('option');
+      op.value = etiquetaPaciente(p);
+      lista.appendChild(op);
+    });
+    document.getElementById('prestamo-paciente-input').value = '';
+    document.getElementById('prestamo-paciente').value = '';
+    document.getElementById('prestamo-vencimiento').value = '';
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+// Texto que se ve en el buscador: nombre + teléfono (distingue a dos pacientes con el mismo nombre)
+function etiquetaPaciente(p) {
+  return p.telefono1 ? `${p.nombre} — ${p.telefono1}` : p.nombre;
+}
+
+function seleccionarPacientePrestamo() {
+  const texto = document.getElementById('prestamo-paciente-input').value;
+  const p = pacientesCache.find(x => etiquetaPaciente(x) === texto);
+  document.getElementById('prestamo-paciente').value = p ? p.id : '';
+  actualizarVencimientoSugerido();
+}
+
+function actualizarVencimientoSugerido() {
+  const id = parseInt(document.getElementById('prestamo-paciente').value, 10);
+  const p = pacientesCache.find(x => x.id === id);
+  const campo = document.getElementById('prestamo-vencimiento');
+  if (!p) { campo.value = ''; return; }
+  const f = new Date();
+  f.setDate(f.getDate() + (DIAS_PERIODO[p.periodo] || 180));
+  campo.value = fechaISO(f);
+}
+
+async function guardarPrestamo() {
+  const paciente_id = parseInt(document.getElementById('prestamo-paciente').value, 10);
+  const cantidad = parseInt(document.getElementById('prestamo-cantidad').value, 10);
+  const fecha_vencimiento = document.getElementById('prestamo-vencimiento').value;
+  const observaciones = document.getElementById('prestamo-obs').value;
+
+  if (!paciente_id) { alert('Elegí un paciente de la lista de sugerencias.'); return; }
+  if (!cantidad || cantidad < 1) { alert('Ingresá una cantidad válida (1 o más).'); return; }
+
+  try {
+    const res = await fetch(`${API_BASE}/prestamos`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ paciente_id, cantidad, fecha_vencimiento, observaciones })
+    });
+    if (res.status === 401 || res.status === 422) {
+      localStorage.removeItem('token');
+      alert('Tu sesión expiró. Volvé a iniciar sesión.');
+      show('login');
+      return;
+    }
+    const data = await res.json();
+    if (res.ok) {
+      alert('✅ Préstamo registrado.');
+      document.getElementById('prestamo-cantidad').value = 1;
+      document.getElementById('prestamo-obs').value = '';
+      prepararPrestamo();
+      cargarDashboard();
+    } else {
+      alert(data.error || 'Ocurrió un error.');
+    }
+  } catch (err) {
+    console.error(err);
+    alert('No se pudo conectar con el servidor.');
   }
 }

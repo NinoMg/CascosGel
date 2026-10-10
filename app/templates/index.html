@@ -223,6 +223,54 @@
   </div>
 </div>
 
+<div class="screen" id="screen-prestamo">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Nuevo préstamo</div>
+      <div class="page-sub">Registrá la entrega de cascos a un paciente</div>
+    </div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-label">Cascos disponibles</div>
+      <div class="stat-value success" id="prestamo-disponibles">0</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><div class="card-title">📋 Datos del préstamo</div></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Paciente *</label>
+          <select id="prestamo-paciente" onchange="actualizarVencimientoSugerido()"></select>
+        </div>
+        <div class="form-group">
+          <label>Cantidad de cascos *</label>
+          <input type="number" id="prestamo-cantidad" min="1" value="1">
+        </div>
+        <div class="form-group">
+          <label>Fecha de vencimiento *</label>
+          <input type="date" id="prestamo-vencimiento">
+          <div class="page-sub">Se sugiere según el período del paciente; podés cambiarla.</div>
+        </div>
+        <div class="form-group">
+          <label>Paciente *</label>
+          <input type="text" id="prestamo-paciente-input" list="lista-pacientes"
+            placeholder="Escribí el nombre para buscar..." autocomplete="off"
+            oninput="seleccionarPacientePrestamo()">
+          <datalist id="lista-pacientes"></datalist>
+          <input type="hidden" id="prestamo-paciente">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="guardarPrestamo()">Registrar préstamo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
   </div>
 </div>
 
