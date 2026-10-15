@@ -27,7 +27,7 @@ function show(name) {
   if (name === 'pacientes') cargarPacientes();
   if (name === 'cascos') cargarStock();
   if (name === 'prestamo') prepararPrestamo();
-
+  if (name === 'historial') cargarHistorial();
 }
 
 
@@ -84,7 +84,7 @@ function renderPacientes() {
       <td>
         <div class="row-actions">
           <button class="btn btn-sm" onclick="editarPaciente(${p.id})">Editar</button>
-          <button class="btn btn-sm" onclick="show('historial')">Ver</button>
+          <button class="btn btn-sm" onclick="verHistorialPaciente(${p.id})">Ver</button>
           <button class="btn btn-sm btn-wsp" onclick="enviarWhatsAppPaciente(${p.id})">💬 WhatsApp</button>
         </div>
       </td>
@@ -330,6 +330,10 @@ async function prepararPrestamo() {
     document.getElementById('prestamo-paciente-input').value = '';
     document.getElementById('prestamo-paciente').value = '';
     document.getElementById('prestamo-vencimiento').value = '';
+
+    const campoFecha = document.getElementById('prestamo-fecha');
+    campoFecha.value = fechaISO(new Date());
+    campoFecha.max = fechaISO(new Date());
   } catch (err) {
     console.error(err);
   }
@@ -352,7 +356,8 @@ function actualizarVencimientoSugerido() {
   const p = pacientesCache.find(x => x.id === id);
   const campo = document.getElementById('prestamo-vencimiento');
   if (!p) { campo.value = ''; return; }
-  const f = new Date();
+  const entrega = document.getElementById('prestamo-fecha').value;
+  const f = entrega ? new Date(entrega + 'T00:00:00') : new Date();
   f.setDate(f.getDate() + (DIAS_PERIODO[p.periodo] || 180));
   campo.value = fechaISO(f);
 }
@@ -360,6 +365,7 @@ function actualizarVencimientoSugerido() {
 async function guardarPrestamo() {
   const paciente_id = parseInt(document.getElementById('prestamo-paciente').value, 10);
   const cantidad = parseInt(document.getElementById('prestamo-cantidad').value, 10);
+  const fecha_prestamo = document.getElementById('prestamo-fecha').value;
   const fecha_vencimiento = document.getElementById('prestamo-vencimiento').value;
   const observaciones = document.getElementById('prestamo-obs').value;
 
@@ -370,7 +376,7 @@ async function guardarPrestamo() {
     const res = await fetch(`${API_BASE}/prestamos`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ paciente_id, cantidad, fecha_vencimiento, observaciones })
+      body: JSON.stringify({ paciente_id, cantidad, fecha_prestamo, fecha_vencimiento, observaciones })
     });
     if (res.status === 401 || res.status === 422) {
       localStorage.removeItem('token');
@@ -392,4 +398,101 @@ async function guardarPrestamo() {
     console.error(err);
     alert('No se pudo conectar con el servidor.');
   }
+}
+
+// ---- Historial y devoluciones ----
+let historialCache = [];
+
+function formatearFecha(iso) {
+  if (!iso) return '—';
+  const [a, m, d] = iso.split('-');
+  return `${d}/${m}/${a}`;
+}
+
+async function cargarHistorial() {
+  if (!localStorage.getItem('token')) return;
+  const estado = document.getElementById('historial-estado').value;
+  try {
+    const res = await fetch(`${API_BASE}/prestamos?estado=${estado}`, { headers: getHeaders() });
+    if (res.status === 401 || res.status === 422) {
+      localStorage.removeItem('token');
+      show('login');
+      return;
+    }
+    if (!res.ok) return;
+    historialCache = await res.json();
+    renderHistorial();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function renderHistorial() {
+  const tbody = document.getElementById('tabla-historial-body');
+  if (!tbody) return;
+  const q = (document.getElementById('historial-buscar').value || '').trim().toLowerCase();
+  const lista = historialCache.filter(p => !q || (p.paciente_nombre || '').toLowerCase().includes(q));
+
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="6">No hay préstamos para mostrar.</td></tr>';
+    return;
+  }
+
+  const badges = { activo: 'badge-accent', vencido: 'badge-danger', devuelto: 'badge-success' };
+  tbody.innerHTML = lista.map(p => `
+    <tr>
+      <td><strong>${esc(p.paciente_nombre)}</strong></td>
+      <td>${p.cantidad}</td>
+      <td>${formatearFecha(p.fecha_prestamo)}</td>
+      <td>${formatearFecha(p.fecha_vencimiento)}</td>
+      <td>
+        <span class="badge ${badges[p.estado] || 'badge-neutral'}">${esc(p.estado)}</span>
+        ${p.fecha_devolucion ? '<div class="page-sub">el ' + formatearFecha(p.fecha_devolucion) + '</div>' : ''}
+      </td>
+      <td>
+        <div class="row-actions">
+          ${p.estado !== 'devuelto' ? `
+            <button class="btn btn-sm btn-primary" onclick="registrarDevolucion(${p.id})">Registrar devolución</button>
+            <button class="btn btn-sm btn-wsp" onclick="avisarVencimiento(${p.id})">💬 WhatsApp</button>` : ''}
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function registrarDevolucion(id) {
+  const p = historialCache.find(x => x.id === id);
+  if (!p || !confirm(`¿Registrar la devolución de ${p.cantidad} casco(s) de ${p.paciente_nombre}?`)) return;
+  try {
+    const res = await fetch(`${API_BASE}/prestamos/${id}/devolucion`, { method: 'POST', headers: getHeaders() });
+    if (res.status === 401 || res.status === 422) {
+      localStorage.removeItem('token');
+      alert('Tu sesión expiró. Volvé a iniciar sesión.');
+      show('login');
+      return;
+    }
+    const data = await res.json();
+    if (res.ok) {
+      alert('✅ Devolución registrada.');
+      cargarHistorial();
+      cargarDashboard();
+    } else {
+      alert(data.error || 'Ocurrió un error.');
+    }
+  } catch (err) {
+    console.error(err);
+    alert('No se pudo conectar con el servidor.');
+  }
+}
+
+function avisarVencimiento(id) {
+  const p = historialCache.find(x => x.id === id);
+  if (p) enviarWhatsApp(p.paciente_telefono1, p.paciente_nombre, formatearFecha(p.fecha_vencimiento));
+}
+
+function verHistorialPaciente(id) {
+  const p = pacientesCache.find(x => x.id === id);
+  document.getElementById('historial-estado').value = 'todos';
+  document.getElementById('historial-buscar').value = p ? p.nombre : '';
+  show('historial');
 }

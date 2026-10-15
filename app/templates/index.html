@@ -231,6 +231,38 @@
     </div>
   </div>
 
+<div class="screen" id="screen-historial">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Historial de préstamos</div>
+      <div class="page-sub">Seguimiento de entregas y devoluciones</div>
+    </div>
+    <button class="btn btn-primary" onclick="show('prestamo')">+ Nuevo préstamo</button>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <select id="historial-estado" onchange="cargarHistorial()">
+        <option value="pendientes">Pendientes de devolución</option>
+        <option value="vencidos">Vencidos</option>
+        <option value="devueltos">Devueltos</option>
+        <option value="todos">Todos</option>
+      </select>
+      <input type="search" id="historial-buscar" placeholder="Buscar por paciente..." oninput="renderHistorial()">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Paciente</th><th>Cascos</th><th>Entrega</th><th>Vencimiento</th><th>Estado</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-historial-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
   <div class="stat-grid">
     <div class="stat-card">
       <div class="stat-label">Cascos disponibles</div>
@@ -247,6 +279,13 @@
           <label>Cantidad de cascos *</label>
           <input type="number" id="prestamo-cantidad" min="1" value="1">
         </div>
+
+        <div class="form-group">
+          <label>Fecha de entrega *</label>
+          <input type="date" id="prestamo-fecha" onchange="actualizarVencimientoSugerido()">
+          <div class="page-sub">Hoy por defecto. Cambiala si cargás un préstamo ya entregado.</div>
+        </div>
+
         <div class="form-group">
           <label>Fecha de vencimiento *</label>
           <input type="date" id="prestamo-vencimiento">

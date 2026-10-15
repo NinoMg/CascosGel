@@ -192,22 +192,68 @@ def crear_prestamo():
     if cantidad > stock.disponibles():
         return jsonify({'error': f'Solo hay {stock.disponibles()} cascos disponibles'}), 400
 
-    hoy = date.today()
+        hoy = date.today()
+
+    # Fecha de entrega: hoy por defecto; se puede indicar una anterior (préstamos ya en curso)
+    fecha_prestamo = hoy
+    if data.get('fecha_prestamo'):
+        try:
+            fecha_prestamo = date.fromisoformat(data['fecha_prestamo'])
+        except ValueError:
+            return jsonify({'error': 'Fecha de entrega inválida'}), 400
+        if fecha_prestamo > hoy:
+            return jsonify({'error': 'La fecha de entrega no puede ser futura'}), 400
+
     if data.get('fecha_vencimiento'):
         try:
             vencimiento = date.fromisoformat(data['fecha_vencimiento'])
         except ValueError:
             return jsonify({'error': 'Fecha de vencimiento inválida'}), 400
     else:
-        vencimiento = calcular_fecha_vencimiento(hoy, paciente.periodo)
+        vencimiento = calcular_fecha_vencimiento(fecha_prestamo, paciente.periodo)
+
+    if vencimiento < fecha_prestamo:
+        return jsonify({'error': 'El vencimiento no puede ser anterior a la entrega'}), 400
 
     prestamo = Prestamo(
         paciente_id=paciente.id,
         cantidad=cantidad,
-        fecha_prestamo=hoy,
+        fecha_prestamo=fecha_prestamo,
         fecha_vencimiento=vencimiento,
         observaciones=(data.get('observaciones') or '').strip() or None
     )
     db.session.add(prestamo)
     db.session.commit()
     return jsonify(prestamo.to_dict()), 201
+
+@api.route('/prestamos', methods=['GET'])
+@jwt_required()
+def listar_prestamos():
+    estado = request.args.get('estado', 'pendientes')
+    consulta = Prestamo.query
+    if estado == 'pendientes':
+        consulta = consulta.filter(Prestamo.fecha_devolucion.is_(None))
+    elif estado == 'vencidos':
+        consulta = consulta.filter(Prestamo.fecha_devolucion.is_(None),
+                                   Prestamo.fecha_vencimiento < date.today())
+    elif estado == 'devueltos':
+        consulta = consulta.filter(Prestamo.fecha_devolucion.isnot(None))
+
+    if estado in ('pendientes', 'vencidos'):
+        consulta = consulta.order_by(Prestamo.fecha_vencimiento.asc())   # primero los más urgentes
+    else:
+        consulta = consulta.order_by(Prestamo.fecha_prestamo.desc(), Prestamo.id.desc())
+
+    return jsonify([p.to_dict() for p in consulta.all()]), 200
+
+@api.route('/prestamos/<int:prestamo_id>/devolucion', methods=['POST'])
+@jwt_required()
+def registrar_devolucion(prestamo_id):
+    prestamo = db.session.get(Prestamo, prestamo_id)
+    if not prestamo:
+        return jsonify({'error': 'Préstamo no encontrado'}), 404
+    if prestamo.fecha_devolucion:
+        return jsonify({'error': 'Este préstamo ya fue devuelto'}), 400
+    prestamo.fecha_devolucion = date.today()
+    db.session.commit()
+    return jsonify(prestamo.to_dict()), 200
