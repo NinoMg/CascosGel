@@ -1,5 +1,27 @@
 const API_BASE = '/api';
 
+// ---- Avisos (cartelitos) ----
+function avisar(texto, tipo = 'info') {
+  let caja = document.getElementById('avisos');
+  if (!caja) {
+    caja = document.createElement('div');
+    caja.id = 'avisos';
+    document.body.appendChild(caja);
+  }
+  const aviso = document.createElement('div');
+  aviso.className = 'aviso aviso-' + tipo;
+  aviso.textContent = texto;
+  aviso.onclick = () => aviso.remove();
+  caja.appendChild(aviso);
+  setTimeout(() => aviso.remove(), tipo === 'error' ? 6000 : 3500);
+}
+
+// Reemplaza las ventanitas alert() del navegador por cartelitos en pantalla
+window.alert = function (mensaje) {
+  const texto = String(mensaje);
+  avisar(texto.replace(/^✅\s*/, ''), texto.startsWith('✅') ? 'ok' : 'error');
+};
+
 // Función auxiliar para generar encabezados con el Token JWT
 function getHeaders() {
   const token = localStorage.getItem('token');
@@ -386,7 +408,7 @@ async function guardarPrestamo() {
     }
     const data = await res.json();
     if (res.ok) {
-      alert('✅ Préstamo registrado.');
+      alert(`✅ Préstamo registrado: ${data.cantidad} casco(s) para ${data.paciente_nombre}, vence el ${formatearFecha(data.fecha_vencimiento)}.`);
       document.getElementById('prestamo-cantidad').value = 1;
       document.getElementById('prestamo-obs').value = '';
       prepararPrestamo();
@@ -473,7 +495,7 @@ async function registrarDevolucion(id) {
     }
     const data = await res.json();
     if (res.ok) {
-      alert('✅ Devolución registrada.');
+      alert(`✅ Devolución registrada: ${p.cantidad} casco(s) de ${p.paciente_nombre} vuelven al stock.`);
       cargarHistorial();
       cargarDashboard();
     } else {

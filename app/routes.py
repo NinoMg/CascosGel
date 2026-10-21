@@ -192,7 +192,7 @@ def crear_prestamo():
     if cantidad > stock.disponibles():
         return jsonify({'error': f'Solo hay {stock.disponibles()} cascos disponibles'}), 400
 
-        hoy = date.today()
+    hoy = date.today()
 
     # Fecha de entrega: hoy por defecto; se puede indicar una anterior (préstamos ya en curso)
     fecha_prestamo = hoy
