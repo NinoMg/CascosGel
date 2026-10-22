@@ -41,7 +41,10 @@ function show(name) {
 
   const order = ['login', 'dashboard', 'pacientes', 'cascos', 'prestamo', 'historial'];
   const tabBtn = document.querySelectorAll('.nav-tab')[order.indexOf(name)];
-  if (tabBtn) tabBtn.classList.add('active');
+  if (tabBtn) {
+    tabBtn.classList.add('active');
+    tabBtn.scrollIntoView({ inline: 'center', block: 'nearest' });  // en el celular, deja visible la pestaña activa
+  }
 
   window.scrollTo(0, 0);
 
@@ -98,12 +101,12 @@ function renderPacientes() {
 
   tbody.innerHTML = lista.map(p => `
     <tr>
-      <td><strong>${esc(p.nombre)}</strong></td>
-      <td>${esc(p.direccion)}</td>
-      <td>${esc(p.telefono1)}${p.telefono2 ? ' / ' + esc(p.telefono2) : ''}</td>
-      <td><span class="badge badge-accent">${p.cantidad_cascos_prestados} prestados</span></td>
-      <td>${esc(p.periodo)}</td>
-      <td>
+      <td data-label="Paciente"><strong>${esc(p.nombre)}</strong></td>
+      <td data-label="Dirección">${esc(p.direccion)}</td>
+      <td data-label="Teléfonos">${esc(p.telefono1)}${p.telefono2 ? ' / ' + esc(p.telefono2) : ''}</td>
+      <td data-label="Cascos prestados"><span class="badge badge-accent">${p.cantidad_cascos_prestados} prestados</span></td>
+      <td data-label="Período">${esc(p.periodo)}</td>
+      <td data-label="">
         <div class="row-actions">
           <button class="btn btn-sm" onclick="editarPaciente(${p.id})">Editar</button>
           <button class="btn btn-sm" onclick="verHistorialPaciente(${p.id})">Ver</button>
@@ -463,15 +466,15 @@ function renderHistorial() {
   const badges = { activo: 'badge-accent', vencido: 'badge-danger', devuelto: 'badge-success' };
   tbody.innerHTML = lista.map(p => `
     <tr>
-      <td><strong>${esc(p.paciente_nombre)}</strong></td>
-      <td>${p.cantidad}</td>
-      <td>${formatearFecha(p.fecha_prestamo)}</td>
-      <td>${formatearFecha(p.fecha_vencimiento)}</td>
-      <td>
+      <td data-label="Paciente"><strong>${esc(p.paciente_nombre)}</strong></td>
+      <td data-label="Cascos">${p.cantidad}</td>
+      <td data-label="Entrega">${formatearFecha(p.fecha_prestamo)}</td>
+      <td data-label="Vencimiento">${formatearFecha(p.fecha_vencimiento)}</td>
+      <td data-label="Estado">
         <span class="badge ${badges[p.estado] || 'badge-neutral'}">${esc(p.estado)}</span>
         ${p.fecha_devolucion ? '<div class="page-sub">el ' + formatearFecha(p.fecha_devolucion) + '</div>' : ''}
       </td>
-      <td>
+      <td data-label="">
         <div class="row-actions">
           ${p.estado !== 'devuelto' ? `
             <button class="btn btn-sm btn-primary" onclick="registrarDevolucion(${p.id})">Registrar devolución</button>
