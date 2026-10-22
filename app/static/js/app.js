@@ -33,14 +33,18 @@ function getHeaders() {
 
 // Navegación entre vistas
 function show(name) {
+  // Sin sesión iniciada, solo se puede ver el login
+  const hayToken = !!localStorage.getItem('token');
+  if (!hayToken && name !== 'login') name = 'login';
+  document.body.classList.toggle('logueado', hayToken);
+
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
 
   const targetScreen = document.getElementById('screen-' + name);
   if (targetScreen) targetScreen.classList.add('active');
 
-  const order = ['login', 'dashboard', 'pacientes', 'cascos', 'prestamo', 'historial'];
-  const tabBtn = document.querySelectorAll('.nav-tab')[order.indexOf(name)];
+  const tabBtn = document.querySelector(`.nav-tab[data-screen="${name}"]`);
   if (tabBtn) {
     tabBtn.classList.add('active');
     tabBtn.scrollIntoView({ inline: 'center', block: 'nearest' });  // en el celular, deja visible la pestaña activa
@@ -207,6 +211,7 @@ async function iniciarSesion() {
 
     if (res.ok && (data.access_token || data.token)) {
       localStorage.setItem('token', data.access_token || data.token);
+      document.getElementById('login-password').value = '';
       show('dashboard');
     } else {
       alert(data.error || 'Credenciales inválidas');
@@ -521,3 +526,16 @@ function verHistorialPaciente(id) {
   document.getElementById('historial-buscar').value = p ? p.nombre : '';
   show('historial');
 }
+
+// ---- Sesión ----
+function cerrarSesion() {
+  localStorage.removeItem('token');
+  pacientesCache = [];
+  historialCache = [];
+  document.getElementById('login-password').value = '';
+  show('login');
+  avisar('Sesión cerrada.', 'info');
+}
+
+// Al abrir la página: con sesión va al panel; sin sesión, al login
+show(localStorage.getItem('token') ? 'dashboard' : 'login');

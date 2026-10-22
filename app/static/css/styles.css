@@ -143,6 +143,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #0891b2
   #avisos { top: auto; bottom: 16px; left: 12px; right: 12px; max-width: none; }
 }
 
+/* Sin sesión iniciada solo se ve el login: se oculta el menú, el avatar y "Cerrar sesión" */
+body:not(.logueado) .nav-tabs,
+body:not(.logueado) #btn-logout,
+body:not(.logueado) .avatar { display: none; }
+
 /* ── Avisos (cartelitos) ── */
 #avisos { position: fixed; top: 64px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; max-width: 360px; }
 .aviso { padding: 12px 16px; border-radius: 10px; font-size: 13px; font-weight: 500; box-shadow: 0 4px 14px rgba(0,0,0,.15); cursor: pointer; animation: aviso-entrar .2s ease-out; }
